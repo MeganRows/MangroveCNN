@@ -1,0 +1,90 @@
+!pip install tensorflow-io
+
+!pip install split-folders
+
+import splitfolders
+
+input_folder = r"C:\Users\Carl Dalabajan\OneDrive\Desktop\manalo_dataextension\2nd_manalo_data\vgg19_data"
+output = r"C:\Users\Carl Dalabajan\OneDrive\Desktop\manalo_dataextension\2nd_manalo_data\vgg19_TVT"
+splitfolders.ratio(input_folder, output, seed = 42, ratio=(.6, .2, .2))
+
+from tensorflow.keras.layers import Conv2D, Flatten, Dense, MaxPool2D, BatchNormalization, GlobalAveragePooling2D
+from tensorflow.keras.applications.resnet50 import preprocess_input, decode_predictions
+from tensorflow.keras.preprocessing.image import ImageDataGenerator, load_img
+from tensorflow.keras.applications.resnet50 import ResNet50
+from tensorflow.keras.preprocessing import image
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Model
+from tensorflow.keras.callbacks import EarlyStopping
+import matplotlib.pyplot as plt
+import numpy as np
+import cv2
+
+import os
+from PIL import Image
+img_width, img_height = (224, 224)
+batch_size = 128
+
+train_data_dir = r"C:\Users\Carl Dalabajan\OneDrive\Desktop\manalo_dataextension\2nd_manalo_data\vgg19_TVT\train"
+valid_data_dir = r"C:\Users\Carl Dalabajan\OneDrive\Desktop\manalo_dataextension\2nd_manalo_data\vgg19_TVT\val"
+test_data_dir = r"C:\Users\Carl Dalabajan\OneDrive\Desktop\manalo_dataextension\2nd_manalo_data\vgg19_TVT\test"
+
+train_datagen = ImageDataGenerator(preprocessing_function=preprocess_input,
+                                   shear_range = 0.2,
+                                   zoom_range = 0.2,
+                                   horizontal_flip = True,
+                                  validation_split=0.2)
+                                  
+train_generator = train_datagen.flow_from_directory(train_data_dir, target_size=(img_width, img_height), batch_size=batch_size, class_mode='categorical', subset='training')
+valid_generator = train_datagen.flow_from_directory(valid_data_dir, target_size=(img_width, img_height), batch_size=batch_size, class_mode='categorical', subset='validation')
+
+test_generator = train_datagen.flow_from_directory(test_data_dir,
+        target_size=(img_height, img_width),
+        batch_size=1,
+        color_mode='rgb',
+        class_mode='categorical', subset='validation')
+        
+ x,y = test_generator.next()
+x.shape
+
+early_stop = EarlyStopping(monitor='val_accuracy')
+
+base_model = ResNet50(include_top=False, weights='imagenet')
+x = base_model.output
+x = GlobalAveragePooling2D()(x)
+x = Dense(1024, activation='relu')(x)
+predictions= Dense(train_generator.num_classes, activation='softmax')(x)
+model = Model (inputs=base_model.input, outputs=predictions)
+
+for layer in base_model.layers:
+    layer.trainable = False
+    
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+model.fit(train_generator, epochs = 10, validation_data=valid_generator)
+model.save("trained_model.h5")   
+
+train_generator.num_classes
+
+train_generator.class_indices
+
+test_loss, test_acc = model.evaluate(test_generator, verbose=2)
+print('\nTest Accuracy:', test_acc) 
+
+//model prediction//
+from keras.models import load_model
+
+class_indices = train_generator.class_indices
+model = load_model('trained_model.h5')
+
+img_path = r'C:\Users\Carl Dalabajan\OneDrive\Desktop\manalo_dataextension\test file\BS_2.jpg'
+img = cv2.imread(img_path)
+
+img = image.load_img(img_path, target_size=(224, 224))
+x = image.img_to_array(img)
+x = np.expand_dims(x, axis=0)
+x = preprocess_input(x)
+
+features = model.predict(x)
+predictions = model.predict(x)
+predicted_class = np.argmax(predictions[0])
+print(f'Predicted class: {predicted_class}')
