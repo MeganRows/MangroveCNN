@@ -1,2 +1,2 @@
 # MangroveCNN
-Mangrove Analysis at Brgy. Manalo using CNN Model
+Mangrove Analysis using CNN Model
